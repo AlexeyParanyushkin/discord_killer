@@ -14,10 +14,9 @@
   <input placeholder="Chanel Name" id="chanelName" />
   <div class="p-2">
     <video id="localVideo" playsinline autoplay muted></video>
-    <video id="remoteVideo" playsinline autoplay muted></video>
+    <video id="remoteVideo" playsinline autoplay></video>
   </div>
   <div class="mt-2 d-flex gap-2">
-    <button class="btn btn-primary" id="createBroadcast">Create</button>
     <button class="btn btn-primary" id="startButton">Start</button>
     <button class="btn btn-danger" id="hangupButton">Hangup</button>
   </div>
@@ -32,7 +31,6 @@
 
     var startButton ;
     var hangupButton;
-    var createButton;
     var chanelNameInput;
     var localVideo;
     var remoteVideo;
@@ -44,14 +42,13 @@
     function init() {
         startButton = document.getElementById('startButton');
         hangupButton = document.getElementById('hangupButton');
-        createButton = document.getElementById('createBroadcast');
         chanelNameInput = document.getElementById('chanelName');
         // startButton.disabled = true;
         // hangupButton.disabled = true;
         
         startButton.onclick = startCall;
         
-        navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
                 .then(stream => {
                     localVideo = document.getElementById('localVideo');
                     remoteVideo = document.getElementById('remoteVideo');
