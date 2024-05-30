@@ -1,0 +1,57 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@implements IDisposable
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+<div class="p-2 bg-primary bg-opacity-75">
+    @foreach (var log in logs)
+    {
+        <div>@log</div>
+    }
+</div>
+
+<div class="p-2 d-flex">
+    @text
+    <InputText @bind-Value="@text" />
+    <button @onclick="@(Post)">Send</button>
+</div>
+@code {
+    private string text;
+    private List<string> logs = new List<string>();
+    
+    [Inject]
+    private SignalService SignalService { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // SignalService.HandleMessage += AddLog;
+    }
+
+    private void Post()
+    {
+        Console.WriteLine("Post");
+        if (string.IsNullOrWhiteSpace(text)) return;
+        
+        // SignalService.PostMessage(text);
+        text = string.Empty;
+    }
+
+    private void AddLog(string log)
+    {
+        logs.Add(log);
+        Console.WriteLine("AddLog: log");
+        
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        // SignalService.HandleMessage -= AddLog;
+    }
+
+}
