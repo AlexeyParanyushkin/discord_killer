@@ -1,0 +1,102 @@
+﻿@page "/fetchdata"
+@inject HttpClient Http
+
+<PageTitle>Weather forecast</PageTitle>
+
+<h1>Weather forecast</h1>
+
+
+<p>This component demonstrates fetching data from the server.</p>
+
+@if (forecasts == null)
+{
+    <p>
+        <em>Loading...</em>
+    </p>
+}
+else
+{
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Date</th>
+            <th>Temp. (C)</th>
+            <th>Temp. (F)</th>
+            <th>City</th>
+            <th>Summary</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var forecast in forecasts)
+        {
+            <tr>
+                <td>@forecast.Date.ToShortDateString()</td>
+                <td>@forecast.TemperatureC</td>
+                <td>@forecast.TemperatureF</td>
+                <td>@forecast.City</td>
+                <td>@forecast.Summary</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    <div class="row row-cols-6">
+        <div class="col">
+            <input type="date" @bind="@WeatherForecastForAdd.Date" @bind:event="oninput"/>
+        </div>
+        <div class="col">
+            <input type="number" @bind="@WeatherForecastForAdd.TemperatureC" />
+        </div>
+        <div class="col"></div>
+        <div class="col">
+            <input type="text" @bind="@WeatherForecastForAdd.City" @bind:event="oninput"/>
+        </div>
+        <div class="col">
+            <input type="text" @bind="@WeatherForecastForAdd.Summary" @bind:event="oninput"/>
+        </div>
+        <div class="col">
+            <button onclick="@SendMeasurement" class="btn btn-success">Отправить</button>
+        </div>
+    </div>
+    <div>
+        <p>
+            Date: @WeatherForecastForAdd.Date    
+        </p>
+        <p>
+            TemperatureC: @WeatherForecastForAdd.TemperatureC    
+        </p>
+        <p>
+            Summary: @WeatherForecastForAdd.Summary    
+        </p>
+    </div>
+}
+
+@code {
+    private WeatherForecast[]? forecasts;
+
+    public WeatherForecast WeatherForecastForAdd { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        WeatherForecastForAdd = new();
+        forecasts = await Http.GetFromJsonAsync<WeatherForecast[]>("https://localhost:5005/weather");
+    }
+
+    private async Task SendMeasurement()
+    {
+        await Http.PostAsJsonAsync("https://localhost:5005/weather", WeatherForecastForAdd);
+        forecasts = await Http.GetFromJsonAsync<WeatherForecast[]>("https://localhost:5005/weather");
+    }
+
+    public class WeatherForecast
+    {
+        public DateOnly Date { get; set; }
+
+        public int TemperatureC { get; set; }
+
+        public string? Summary { get; set; }
+
+        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+        public string City { get; set; }
+    }
+
+}
