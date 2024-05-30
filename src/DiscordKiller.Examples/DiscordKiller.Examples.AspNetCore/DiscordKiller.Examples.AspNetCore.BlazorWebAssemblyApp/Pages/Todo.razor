@@ -1,0 +1,123 @@
+@page "/todo"
+@inject HttpClient Http
+
+<PageTitle>ToDo</PageTitle>
+
+<h1>Список задач</h1>
+
+@if (todoItems == null)
+{
+    <p>
+        <em>Загрузка...</em>
+    </p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Дата</th>
+                <th>Задача</th>
+                <th>Выполнение</th>
+                <th>Действие</th>
+
+
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var todoItem in todoItems)
+            {
+                <tr>
+                    <th scope="row">1</th>
+                    <td> <input type="date" class="form-control" @bind="@todoItem.Date" @bind:after="@(()=>Update(todoItem))" /></td>
+                    <td> <input type="text" class="form-control" @bind="@todoItem.Title" @bind:after="@(()=>Update(todoItem))" /></td>
+                    <td> <input type="checkbox" class="form-check-input" @bind="@todoItem.Completed" @bind:after="@(()=>Update(todoItem))" /> </td>
+                    <td><button @onclick="@(()=>Delete(todoItem.Id))" class="btn btn-danger">Delete</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<div class="row row-cols-3">
+    <div class="col">
+        <input type="date" @bind="@TodoItemForAdd.Date" />
+    </div>
+    <div class="col">
+        <input type="text" @bind="@TodoItemForAdd.Title" />
+    </div>
+    <div class="col">
+        <input type="checkbox" @bind="@TodoItemForAdd.Completed" />
+    </div>
+</div>
+
+<div>
+    <p>
+        Дата: @TodoItemForAdd.Date.ToShortDateString()
+    </p>
+    <p>
+        Задача: @TodoItemForAdd.Title
+    </p>
+    <p>
+        Выполнение: @TodoItemForAdd.Completed
+    </p>
+</div>
+
+<button @onclick="Create" class="btn btn-success">Добавить задачу</button>
+
+@code {
+    private TodoItem[]? todoItems;
+
+    public TodoItem TodoItemForAdd { get; set; } = new TodoItem();
+
+    protected override async Task OnInitializedAsync()
+    {
+        TodoItemForAdd = new();
+        todoItems = await Http.GetFromJsonAsync<TodoItem[]>("https://localhost:5005/api/todo");
+    }
+
+    private async Task SendMeasurement()
+    {
+        await Http.PostAsJsonAsync("https://localhost:5005/api/todo", TodoItemForAdd);
+        todoItems = await Http.GetFromJsonAsync<TodoItem[]>("https://localhost:5005/api/todo");
+        var newTask = new TodoItem();
+    }
+
+    private async Task Create()
+    {
+        await Http.PostAsJsonAsync("https://localhost:5005/api/todo", TodoItemForAdd);
+        todoItems = await Http.GetFromJsonAsync<TodoItem[]>("https://localhost:5005/api/todo");
+        TodoItemForAdd = new();
+    }
+
+    private async Task Delete(int id)
+    {
+        await Http.DeleteAsync($"https://localhost:5005/api/todo/{id}");
+        todoItems = await Http.GetFromJsonAsync<TodoItem[]>("https://localhost:5005/api/todo");
+
+
+    }
+
+    private async Task Update(TodoItem todoitem)
+    {
+        await Http.PutAsJsonAsync($"https://localhost:5005/api/todo/{todoitem.Id}", todoitem);
+        todoItems = await Http.GetFromJsonAsync<TodoItem[]>("https://localhost:5005/api/todo");
+
+        
+    }
+
+
+
+
+
+    public class TodoItem
+    {
+        public int Id { get; set; }
+        public DateTime Date { get; set; }
+
+        public string Title { get; set; }
+
+        public bool Completed { get; set; }
+    }
+}

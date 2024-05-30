@@ -1,0 +1,207 @@
+﻿@page "/auth"
+@rendermode InteractiveServer
+@implements IDisposable
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+
+@attribute [Authorize]
+
+<PageTitle>Auth</PageTitle>
+
+<h1>You are authenticated</h1>
+
+<div >
+  <input placeholder="Chanel Name" id="chanelName" />
+  <div class="p-2">
+    <video id="localVideo" playsinline autoplay muted></video>
+    <video id="remoteVideo" playsinline autoplay muted></video>
+  </div>
+  <div class="mt-2 d-flex gap-2">
+    <button class="btn btn-primary" id="createBroadcast">Create</button>
+    <button class="btn btn-primary" id="startButton">Start</button>
+    <button class="btn btn-danger" id="hangupButton">Hangup</button>
+  </div>
+</div>
+
+@* <AuthorizeView> *@
+@*     Hello @context.User.Identity?.Name! *@
+@* </AuthorizeView> *@
+
+<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+<script>
+
+    var startButton ;
+    var hangupButton;
+    var createButton;
+    var chanelNameInput;
+    var localVideo;
+    var remoteVideo;
+
+    var localStream;
+    var remoteStream;
+    var peerConnection;
+    
+    function init() {
+        startButton = document.getElementById('startButton');
+        hangupButton = document.getElementById('hangupButton');
+        createButton = document.getElementById('createBroadcast');
+        chanelNameInput = document.getElementById('chanelName');
+        // startButton.disabled = true;
+        // hangupButton.disabled = true;
+        
+        startButton.onclick = startCall;
+        
+        navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+                .then(stream => {
+                    localVideo = document.getElementById('localVideo');
+                    remoteVideo = document.getElementById('remoteVideo');
+                    localVideo.srcObject = stream;
+                    localStream = stream;
+            
+                    // Assume we are the initiator
+                    
+                })
+                .catch(error => {
+                    console.error('Error accessing media devices.', error);
+                });
+    }
+    
+    
+    
+    function startCall() {
+        const servers = {
+            iceServers: [
+                {
+                    urls: 'turn:localhost:3478',
+                    username: 'admin',
+                    credential: 'admin'
+                }
+            ]
+        };
+        peerConnection = new RTCPeerConnection(servers);
+    
+        peerConnection.onicecandidate = event => {
+            console.log(event);
+            if (event.candidate) {
+                sendMessage('ice-candidate', event.candidate);
+            }
+        };
+    
+        peerConnection.ontrack = event => {
+            console.log(event);
+            if (!remoteStream) {
+                remoteVideo = document.getElementById('remoteVideo');
+                remoteStream = new MediaStream();
+                remoteVideo.srcObject = remoteStream;
+            }
+            remoteStream.addTrack(event.track);
+        };
+    
+        localStream.getTracks().forEach(track => {
+            console.log(track);
+            peerConnection.addTrack(track, localStream);
+        });
+    
+        peerConnection.createOffer()
+            .then(offer => {
+                return peerConnection.setLocalDescription(offer);
+            })
+            .then(() => {
+                sendMessage('offer', peerConnection.localDescription);
+            })
+            .catch(error => {
+                console.error('Error creating offer.', error);
+            });
+    }
+    
+    function handleMessage(message) {
+        if (message.type === 'offer') {
+            peerConnection.setRemoteDescription(new RTCSessionDescription(message.payload))
+                .then(() => peerConnection.createAnswer())
+                .then(answer => peerConnection.setLocalDescription(answer))
+                .then(() => sendMessage('answer', peerConnection.localDescription))
+                .catch(error => console.error('Error handling offer.', error));
+        } else if (message.type === 'answer') {
+            peerConnection.setRemoteDescription(new RTCSessionDescription(message.payload))
+                .catch(error => console.error('Error handling answer.', error));
+        } else if (message.type === 'ice-candidate') {
+            peerConnection.addIceCandidate(new RTCIceCandidate(message.payload))
+                .catch(error => console.error('Error adding ice candidate.', error));
+        }
+    }
+    
+    function handleMessageStr(json) {
+        const message = JSON.parse(json);
+        handleMessage(message);
+    }
+    
+    // Example of how to send messages (replace with your signaling implementation)
+    function sendMessage(type, payload) {
+        const message = { type, payload };
+        window.dotnetHelper.invokeMethodAsync("Post", JSON.stringify(message));
+    }
+    
+    function setDotNetHelper(dotnetHelper) {
+        console.log("setDotNetHelper");
+        window.dotnetHelper = dotnetHelper;
+        init();
+    }
+
+</script>
+
+@code {
+
+    [Inject]
+    private SignalService SignalService { get; set; }
+    
+    [Inject]
+    private IJSRuntime JsRuntime { get; set; }
+    
+    private DotNetObjectReference<Auth>? dotNetHelper;
+    
+    [CascadingParameter]
+    private Task<AuthenticationState> _authenticationState { get; set; }
+
+    private string _userId;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        SignalService.HandleMessage += Handle;
+        
+        if (_authenticationState is not null)
+        {
+            var authState = await _authenticationState;
+            var user = authState?.User;
+            _userId = user?.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetHelper = DotNetObjectReference.Create(this);
+            await JsRuntime.InvokeVoidAsync("setDotNetHelper", dotNetHelper);
+        }
+    }
+    
+    [JSInvokable]
+    public void Post(string json)
+    {
+        SignalService.PostMessage(_userId, json);
+    }
+
+    private void Handle(string userId, string json)
+    {
+        if (_userId == userId) return;
+        Console.WriteLine($"handleMessageStr, currentUserID={_userId}, userID={userId}");
+        
+        JsRuntime.InvokeVoidAsync("handleMessageStr", json);
+    }
+
+    public void Dispose()
+    {
+        SignalService.HandleMessage -= Handle;
+    }
+
+}
